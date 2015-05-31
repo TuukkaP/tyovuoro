@@ -1,18 +1,18 @@
 package models
 
 type User struct {
-	Id        int64  `db:"id" json:"id"`
-	Username  string `db:"username" json:"username"`
-	Password  string `db:"password" json:"password"`
-	Role      string `db:"role" json:"role"`
-	Address   string `db:"address" json:"address"`
-	Firstname string `db:"firstname" json:"firstname"`
-	Lastname  string `db:"lastname" json:"lastname"`
-	Email     string `db:"email" json:"email"`
+	UserId    int64  `db:"id" json:"id,omitempty"`
+	Username  string `db:"username" json:"username,omitempty"`
+	Password  string `db:"password" json:"password,omitempty"`
+	Role      string `db:"role" json:"role,omitempty"`
+	Address   string `db:"address" json:"address,omitempty"`
+	Firstname string `db:"firstname" json:"firstname,omitempty"`
+	Lastname  string `db:"lastname" json:"lastname,omitempty"`
+	Email     string `db:"email" json:"email,omitempty"`
 }
 
-func (u User) GetStructMap() *map[string]string {
-	return &map[string]string{
+func (u User) GetStructMap() *map[string]interface{} {
+	return &map[string]interface{}{
 		"username":  u.Username,
 		"password":  u.Password,
 		"role":      u.Role,
@@ -20,4 +20,8 @@ func (u User) GetStructMap() *map[string]string {
 		"firstname": u.Firstname,
 		"lastname":  u.Lastname,
 		"email":     u.Email}
+}
+
+func (u User) GetId() int64 {
+	return u.UserId
 }

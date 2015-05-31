@@ -1,15 +1,19 @@
 package models
 
 type Place struct {
-	Id      int64  `db:"id" json:"id"`
-	Name    string `db:"name" json:"name"`
-	Info    string `db:"info" json:"info"`
-	Address string `db:"address" json:"address"`
+	PlaceId int64  `db:"id" json:"id,omitempty"`
+	Name    string `db:"name" json:"name,omitempty"`
+	Info    string `db:"info" json:"info,omitempty"`
+	Address string `db:"address" json:"address,omitempty"`
 }
 
-func (p Place) GetStructMap() *map[string]string {
-	return &map[string]string{
+func (p Place) GetStructMap() *map[string]interface{} {
+	return &map[string]interface{}{
 		"name":    p.Name,
 		"info":    p.Info,
 		"address": p.Address}
+}
+
+func (p Place) GetId() int64 {
+	return p.PlaceId
 }

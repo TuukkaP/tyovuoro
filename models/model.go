@@ -1,5 +1,6 @@
 package models
 
 type Model interface {
-	GetStructMap() *map[string]string
+	GetId() int64
+	GetStructMap() *map[string]interface{}
 }

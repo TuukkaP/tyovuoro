@@ -5,6 +5,7 @@ import (
 	"flag"
 	. "github.com/TuukkaP/tyovuoro/controllers"
 	"github.com/TuukkaP/tyovuoro/datastore"
+	"github.com/gorilla/context"
 	"log"
 	"net/http"
 	"strconv"
@@ -14,6 +15,9 @@ import (
 
 var users *UserController
 var ctrl map[string]Controller
+var ds = datastore.NewDatastore()
+var loginCtrl = &LoginController{ds}
+var sessionCtrl = &SessionController{}
 
 func main() {
 	port := flag.Int("port", 4000, "Port number")
@@ -25,26 +29,30 @@ func main() {
 			log.Println(err)
 		}
 		log.Println(db.Ping())
-
-		ds := &datastore.Datastore{db}*/
-	ds := datastore.NewDatastore()
-	/*users = &UserController{ds}*/
+	*/
 	ctrl = map[string]Controller{
 		"users":  &UserController{ds},
 		"places": &PlaceController{ds},
+		"orders": &OrderController{ds},
 	}
-
-	http.HandleFunc("/", http.HandlerFunc(ServeIndex))
-	/*	http.HandleFunc("/users", ApiHandler(users.GetAll, "GET"))
-		http.HandleFunc("/users/", ApiHandler(users.Get, "GET"))
-		http.HandleFunc("/usersa/", ApiHandler(users.Update, "PUT"))*/
+	fs := http.FileServer(http.Dir("public/static"))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
+	http.HandleFunc("/", Index)
+	http.HandleFunc("/login", http.HandlerFunc(Login))
+	http.HandleFunc("/logout", http.HandlerFunc(Logout))
 	http.HandleFunc("/api/", ApiResolver)
 
 	log.Println("Server is starting in port: ", *port)
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(*port), nil))
+	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(*port), context.ClearHandler(http.DefaultServeMux)))
 }
 
 func ApiResolver(w http.ResponseWriter, r *http.Request) {
+	username := sessionCtrl.GetUserName(r)
+	if username == "" {
+		log.Println(username)
+		http.Redirect(w, r, "/login", http.StatusBadRequest)
+		return
+	}
 	start := time.Now()
 	var response *Response
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
@@ -60,11 +68,10 @@ func ApiResolver(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "GET":
-		switch {
-		case len(url) == 3:
-			response = c.GetAll(w, r)
-		case len(url) == 4:
+		if len(url) == 4 {
 			response = c.Get(w, r)
+		} else {
+			response = c.GetAll(w, r)
 		}
 	case "PUT":
 		response = c.Update(w, r)
@@ -91,10 +98,34 @@ func ApiResolver(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Write(bytes)
-	log.Println(r.Method, r.RequestURI, time.Since(start))
+	log.Println(username, r.Method, r.RequestURI, time.Since(start))
 }
 
-func ApiHandler(fn func(http.ResponseWriter, *http.Request) *Response, method string) http.HandlerFunc {
+func Login(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "POST":
+		loginCtrl.Login(w, r, sessionCtrl)
+		http.Redirect(w, r, "/", 302)
+	default:
+		http.ServeFile(w, r, "public/login.html")
+	}
+}
+
+func Logout(w http.ResponseWriter, r *http.Request) {
+	log.Printf("%v logout", sessionCtrl.GetUserName(r))
+	sessionCtrl.ClearSession(w, r)
+	http.Redirect(w, r, "/login", 302)
+}
+
+func Index(w http.ResponseWriter, r *http.Request) {
+	if username := sessionCtrl.GetUserName(r); username == "" {
+		http.Redirect(w, r, "/login", http.StatusBadRequest)
+		return
+	}
+	http.ServeFile(w, r, "public/index.html")
+}
+
+/*func ApiHandler(fn func(http.ResponseWriter, *http.Request) *Response, method string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Check for allowed HTTP method
 		if r.Method != method {
@@ -124,9 +155,4 @@ func ApiHandler(fn func(http.ResponseWriter, *http.Request) *Response, method st
 		log.Println(r.Method, r.RequestURI, time.Since(start))
 		w.Write(bytes)
 	}
-}
-
-func ServeIndex(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.Method + ": " + r.RequestURI)
-	http.ServeFile(w, r, "views/index.html")
-}
+}*/
