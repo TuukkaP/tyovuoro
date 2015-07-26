@@ -30,6 +30,8 @@ var uglify     = require("gulp-uglify");
 var util       = require("gulp-util");
 var vinyl      = require("vinyl-paths");
 var debug      = require("gulp-debug");
+var react      = require('gulp-react');
+var order      = require('gulp-order');
  
 /* ----------------------------------------------------------------------------
  * Locals
@@ -76,7 +78,6 @@ gulp.task("app:stylesheets", function() {
       ],
       outputStyle: 'nested',
       errLogToConsole: true}))
-    .pipe(debug())
     .pipe(gulpif(args.sourcemaps, sourcemaps.init()))
     .pipe(gulpif(args.production,
       postcss([
@@ -96,15 +97,32 @@ gulp.task("app:stylesheets", function() {
 gulp.task("app:javascripts", function() {
   return gulp.src([
     "bower_components/jquery/dist/jquery.js",
-    "bower_components/jquery-placeholder/jquery.placeholder.js",
-    "bower_components/jquery-cookie/jquery.cookie.js",
-    "bower_components/modernizr/modernizr.js",
-    "bower_components/fastclick/lib/fastclick.js",
-    "bower_components/flux/dist/Flux.js",
-    "bower_components/foundation/js/foundation.js",
-    "app/scripts"
-  ]).pipe(gulpif(args.sourcemaps, sourcemaps.init()))
+    "bower_components/react/JSXTransformer.js",
+    "bower_components/react/react-with-addons.js",
+    "bower_components/react-router/build/umd/ReactRouter.js",
+    "bower_components/react-bootstrap/react-bootstrap.js",
+    "bower_components/react-router-bootstrap/lib/ReactRouterBootstrap.js",
+    "app/scripts/**/*.jsx"
+  ])
+    .pipe(order([
+    "bower_components/jquery/dist/jquery.js",
+    "bower_components/react/JSXTransformer.js",
+    "bower_components/react/react-with-addons.js",
+    "bower_components/react-router/build/umd/ReactRouter.js",
+    "bower_components/react-bootstrap/react-bootstrap.js",
+    "bower_components/react-bootstrap/react-bootstrap.js",
+    "bower_components/react-router-bootstrap/lib/ReactRouterBootstrap.js",
+    "app/scripts/app.jsx",
+    "app/scripts/components/*",
+    "app/scripts/actions/*",
+    "app/scripts/constants/*",
+    "app/scripts/stores/*",
+    "app/scripts/dispatcher/*",
+    "app/scripts/routes.jsx"
+      ], { base: './' }))
+    .pipe(gulpif(args.sourcemaps, sourcemaps.init()))
     .pipe(concat("application.js"))
+    .pipe(react())
     .pipe(gulpif(args.sourcemaps, sourcemaps.write()))
     .pipe(gulpif(args.production, uglify()))
     .pipe(gulp.dest("public/static/"))
@@ -116,7 +134,7 @@ gulp.task("app:javascripts", function() {
  */
 gulp.task("app:modernizr", function() {
   return gulp.src([
-    "public/stylesheets/style.css",
+    //"public/stylesheets/style.css",
     "public/javascripts/application.js"
   ]).pipe(
       modernizr({
@@ -189,7 +207,7 @@ gulp.task("app:revisions", [
  * Build app.
  */
 gulp.task("app:build", [
-  "app:stylesheets",
+  //"app:stylesheets",
   "app:javascripts",
   "app:modernizr"
 ]);
@@ -200,13 +218,14 @@ gulp.task("app:build", [
 gulp.task("app:watch", function() {
   
   /* Rebuild stylesheets on-the-fly */
-  gulp.watch([
-    "app/styles/**/*.scss"
-  ], ["app:stylesheets"]);
+  //gulp.watch([
+  //  "app/styles/**/*.scss"
+  //], ["app:stylesheets"]);
  
   /* Rebuild javascripts on-the-fly */
   gulp.watch([
     "app/scripts/**/*.js",
+    "app/scripts/**/*.jsx",
     "bower.json"
   ], ["app:javascripts"]);
 });
@@ -219,6 +238,8 @@ gulp.task("app:watch", function() {
  * Build application server.
  */
 gulp.task("server:build", function() {
+  if (server)
+    server.kill();
   var build = child.spawnSync("go", ["install"]);
   if (build.stderr.length) {
     var lines = build.stderr.toString()

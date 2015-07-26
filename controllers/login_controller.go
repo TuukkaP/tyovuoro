@@ -19,15 +19,20 @@ func (lc LoginController) Login(w http.ResponseWriter, r *http.Request, sessionC
 		log.Println(r.Method + ": " + r.RequestURI + "[" + name + "]")
 		user := User{}
 		err := lc.Datastore.Login(name, pass, &user)
-		if err == nil && user.Username != "" && user.UserId != 0 {
+		if err == nil && user.Username == name && user.UserId != 0 {
 			log.Printf("%v is logging in!", user.Username)
 			sessionCtrl.SetSession(w, r, user)
+			return &Response{user, nil}
 		} else {
 			sessionCtrl.SetFlash(w, r, "Authentication failed!")
-			log.Println(err)
+			return &Response{nil, errors.New("Authentication failed!")}
 		}
-		return &Response{user, nil}
 	} else {
 		return &Response{nil, errors.New("Username or password was empty")}
 	}
+}
+
+func (lc LoginController) Logout(w http.ResponseWriter, r *http.Request, sessionCtrl *SessionController) {
+	sessionCtrl.ClearSession(w, r)
+	log.Printf("Server: Logout User: %v Valid: %v", sessionCtrl.GetUserName(w, r), sessionCtrl.ValidSession(w, r))
 }

@@ -23,13 +23,6 @@ func main() {
 	port := flag.Int("port", 4000, "Port number")
 	flag.Parse()
 
-	/*	log.Println("Connecting to postgres")
-		db, err := sqlx.Open("postgres", "user=tuukka password=tuukka port=5433 dbname=peuranie sslmode=disable")
-		if err != nil {
-			log.Println(err)
-		}
-		log.Println(db.Ping())
-	*/
 	ctrl = map[string]Controller{
 		"users":  &UserController{ds},
 		"places": &PlaceController{ds},
@@ -37,20 +30,20 @@ func main() {
 	}
 	fs := http.FileServer(http.Dir("public/static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
-	http.HandleFunc("/", Index)
-	http.HandleFunc("/login", http.HandlerFunc(Login))
-	http.HandleFunc("/logout", http.HandlerFunc(Logout))
+	http.HandleFunc("/logout", Logout)
+	http.HandleFunc("/login", Login)
 	http.HandleFunc("/api/", ApiResolver)
+	http.HandleFunc("/", Index)
 
 	log.Println("Server is starting in port: ", *port)
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(*port), context.ClearHandler(http.DefaultServeMux)))
 }
 
 func ApiResolver(w http.ResponseWriter, r *http.Request) {
-	username := sessionCtrl.GetUserName(r)
-	if username == "" {
-		log.Println(username)
-		http.Redirect(w, r, "/login", http.StatusBadRequest)
+	username := sessionCtrl.GetUserName(w, r)
+	if v := sessionCtrl.ValidSession(w, r); v == "false" {
+		log.Println("Server: ApiResolver: " + username)
+		http.Redirect(w, r, "/login", 302)
 		return
 	}
 	start := time.Now()
@@ -102,57 +95,37 @@ func ApiResolver(w http.ResponseWriter, r *http.Request) {
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
+	log.Println("---------Server: Login START--------------")
 	switch r.Method {
 	case "POST":
-		loginCtrl.Login(w, r, sessionCtrl)
-		http.Redirect(w, r, "/", 302)
+		response := loginCtrl.Login(w, r, sessionCtrl)
+		if response.Err == nil && response.Data != nil {
+			log.Println("Server: Login redirect")
+			http.Redirect(w, r, "/", http.StatusFound)
+		} else {
+			log.Println("Server: Login serve file")
+			http.ServeFile(w, r, "public/login.html")
+		}
 	default:
 		http.ServeFile(w, r, "public/login.html")
 	}
+	log.Println("---------Server: Login END --------------")
 }
 
 func Logout(w http.ResponseWriter, r *http.Request) {
-	log.Printf("%v logout", sessionCtrl.GetUserName(r))
-	sessionCtrl.ClearSession(w, r)
-	http.Redirect(w, r, "/login", 302)
+	log.Println("---------Server: Logout START--------------")
+	loginCtrl.Logout(w, r, sessionCtrl)
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	log.Println("---------Server: Logout END--------------")
 }
 
 func Index(w http.ResponseWriter, r *http.Request) {
-	if username := sessionCtrl.GetUserName(r); username == "" {
-		http.Redirect(w, r, "/login", http.StatusBadRequest)
-		return
+	log.Println("---------Server: Index START--------------")
+	if v := sessionCtrl.ValidSession(w, r); v == "true" {
+		log.Println("Server: Index: " + sessionCtrl.GetUserName(w, r) + " Valid: " + v)
+		http.ServeFile(w, r, "public/index.html")
+	} else {
+		http.Redirect(w, r, "/login", http.StatusFound)
 	}
-	http.ServeFile(w, r, "public/index.html")
+	log.Println("---------Server: Index END--------------")
 }
-
-/*func ApiHandler(fn func(http.ResponseWriter, *http.Request) *Response, method string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Check for allowed HTTP method
-		if r.Method != method {
-			http.Error(w, "Wrong http method", http.StatusMethodNotAllowed)
-			return
-		}
-
-		start := time.Now()
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
-		w.Header().Set("content-type", "application/json; charset=utf-8")
-
-		response := fn(w, r)
-
-		// Handle reponse errors
-		if response.Err != nil {
-			http.Redirect(w, r, "/", http.StatusBadRequest)
-			log.Println(response.Err)
-			return
-		}
-
-		bytes, e := json.Marshal(response.Data)
-		if e != nil {
-			http.Error(w, "Error marshalling JSON", http.StatusInternalServerError)
-			return
-		}
-
-		log.Println(r.Method, r.RequestURI, time.Since(start))
-		w.Write(bytes)
-	}
-}*/

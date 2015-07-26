@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	. "github.com/TuukkaP/tyovuoro/models"
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
@@ -11,7 +12,6 @@ import (
 
 type SessionController struct{}
 
-/*var cookieHandler = securecookie.New(securecookie.GenerateRandomKey(64), securecookie.GenerateRandomKey(32))*/
 var store = sessions.NewCookieStore([]byte(securecookie.GenerateRandomKey(64)))
 
 func (sc SessionController) SetSession(w http.ResponseWriter, r *http.Request, user User) {
@@ -19,21 +19,13 @@ func (sc SessionController) SetSession(w http.ResponseWriter, r *http.Request, u
 	session.Values["username"] = user.Username
 	session.Values["user_id"] = user.UserId
 	session.Values["timestamp"] = time.Now().String()
-	session.AddFlash("Welcome!", "flash")
+	session.Values["valid"] = "true"
+	uc := http.Cookie{Name: "username", Value: user.Username}
+	idc := http.Cookie{Name: "user_id", Value: fmt.Sprintf("%v", user.UserId)}
+	http.SetCookie(w, &uc)
+	http.SetCookie(w, &idc)
 	sc.SaveSession(w, r, session)
 	log.Println("Cookie was set for " + user.Username)
-	/*	value := map[string]string{
-		"username": user.Username,
-		"id":       strconv.FormatInt(user.UserId, 10),
-	}*/
-	/*	if encoded, err := cookieHandler.Encode("session", value); err == nil {
-		cookie := &http.Cookie{
-			Name:  "Tyovuoro",
-			Value: encoded,
-			Path:  "/",
-		}
-		http.SetCookie(w, cookie)
-	}*/
 }
 
 func (sc SessionController) SetFlash(w http.ResponseWriter, r *http.Request, msg string) {
@@ -43,64 +35,59 @@ func (sc SessionController) SetFlash(w http.ResponseWriter, r *http.Request, msg
 }
 
 func (sc SessionController) ClearSession(w http.ResponseWriter, r *http.Request) {
-	/*	cookie := &http.Cookie{
-			Name:   "Tyovuoro",
-			Value:  "",
-			Path:   "/",
-			MaxAge: -1,
-		}
-		http.SetCookie(w, cookie)*/
 	session := sc.GetSession(w, r)
 	session.Values["username"] = nil
 	session.Values["user_id"] = nil
 	session.Values["timestamp"] = nil
+	session.Values["valid"] = "false"
 	session.AddFlash("Logout!")
+	session.Options = &sessions.Options{
+		MaxAge: -1,
+	}
 	sc.SaveSession(w, r, session)
 }
 
-func (sc SessionController) GetUserName(r *http.Request) string {
-	/*	if cookie, err := request.Cookie("Tyovuoro"); err == nil {
-		cookieValue := make(map[string]string)
-		if err = cookieHandler.Decode("session", cookie.Value, &cookieValue); err == nil {
-			userName = cookieValue["username"]
-		}
-	}*/
+func (sc SessionController) GetUserName(w http.ResponseWriter, r *http.Request) string {
 	session := sc.GetSession(w, r)
 	userName, ok := session.Values["username"].(string)
 	if ok == false {
 		userName = ""
-		log.Println(err)
 	}
+	log.Println("SessionController: GetUserName: " + userName)
 	return userName
 }
 
-func (sc SessionController) GetUserId(r *http.Request) int64 {
-	/*	if cookie, err := request.Cookie("Tyovuoro"); err == nil {
-		cookieValue := make(map[string]string)
-		if err = cookieHandler.Decode("session", cookie.Value, &cookieValue); err == nil {
-			id, _ = strconv.ParseInt(cookieValue["id"], 10, 64)
-		}
-	}*/
+func (sc SessionController) GetUserId(w http.ResponseWriter, r *http.Request) int64 {
 	session := sc.GetSession(w, r)
 	id, ok := session.Values["user_id"].(int64)
 	if ok == false {
 		id = -1
-		log.Println(err)
 	}
+	log.Println("SessionController: GetUserId: " + fmt.Sprintf("%v", id))
 	return id
 }
 
 func (sc SessionController) GetSession(w http.ResponseWriter, r *http.Request) *sessions.Session {
 	session, err := store.Get(r, "tyovuoro-sessio")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Println("ERROR: SessionController: GetSession: " + err.Error())
 	}
 	return session
 }
 
 func (sc SessionController) SaveSession(w http.ResponseWriter, r *http.Request, s *sessions.Session) {
-	err := session.Save(r, w)
+	err := s.Save(r, w)
 	if err != nil {
-		log.Println(err)
+		log.Println("ERROR: SessionController: SaveSession: " + err.Error())
 	}
+}
+
+func (sc SessionController) ValidSession(w http.ResponseWriter, r *http.Request) string {
+	session := sc.GetSession(w, r)
+	valid, ok := session.Values["valid"].(string)
+	if ok == false {
+		valid = "false"
+	}
+	log.Println("SessionController: ValidSession: " + valid)
+	return valid
 }

@@ -19,6 +19,7 @@
     "gulp-match": "^0.2.1",
     "gulp-minify-css": "^1.1.0",
     "gulp-modernizr": "^1.0.0-alpha",
+    "gulp-order": "^1.1.1",
     "gulp-plumber": "^1.0.0",
     "gulp-postcss": "^5.1.3",
     "gulp-rev": "^3.0.1",
